@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ====== THEME BARBER ====== */
+:root {
+  --bg-main: #000000;
+  --bg-card: #121212;
+  --bg-soft: #1A1A1A;
+  --accent: #FFCC00;
+  --accent-hover: #e6b800;
+  --text-main: #ffffff;
+  --text-muted: #a3a3a3;
+  --border-subtle: #262626;
+}
+
+/* ====== BASE ====== */
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: system-ui, sans-serif;
+}
+
+/* ====== COMPONENT CLASSES ====== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+}
+
+.input {
+  background: #000;
+  border: 1px solid var(--border-subtle);
+  color: white;
+  border-radius: 10px;
+  padding: 12px;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 12px;
+  transition: 0.2s;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-soft);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.service-btn {
+  background: var(--bg-soft);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  transition: 0.2s;
+}
+
+.service-btn:hover {
+  border-color: var(--accent);
+}
+
+.service-active {
+  border: 2px solid var(--accent);
+}
+
+.total {
+  color: var(--accent);
+  font-size: 2rem;
+  font-weight: bold;
+}

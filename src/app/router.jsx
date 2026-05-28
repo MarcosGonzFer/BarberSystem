@@ -64,7 +64,7 @@ function ProtectedRoute({ children, allowedRoles }) {
 // ⌨️ KEYPAD / CONTROL DE ACCESO POR PIN DE DUEÑO
 function AdminPinGate({ children }) {
   // Pon aquí el PIN o contraseña que el dueño usará para desbloquear las páginas sensibles
-  const ADMIN_PIN = "1234"; 
+  const ADMIN_PIN = "cuco"; 
 
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);

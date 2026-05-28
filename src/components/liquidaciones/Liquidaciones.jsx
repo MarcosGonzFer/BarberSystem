@@ -4,8 +4,9 @@ import {
   Users, TrendingUp, Download, Banknote, Wallet, 
   CalendarDays, ChevronLeft, ChevronRight, Calendar
 } from "lucide-react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
-// Función auxiliar para obtener el número de semana
 const getWeekNumber = (d) => {
   d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
@@ -13,7 +14,6 @@ const getWeekNumber = (d) => {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 };
 
-// Función para obtener el rango de fechas de una semana
 const getWeekRange = (weekNo, year) => {
   const firstDayOfYear = new Date(year, 0, 1);
   const days = (weekNo - 1) * 7;
@@ -28,8 +28,7 @@ export default function Liquidaciones() {
   const [perfiles, setPerfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // --- ESTADOS DE FILTRO ---
-  const [modo, setModo] = useState("mes"); // "mes" o "semana"
+  const [modo, setModo] = useState("mes");
   const [fechaBase, setFechaBase] = useState(new Date());
 
   const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -45,7 +44,6 @@ export default function Liquidaciones() {
     setLoading(false);
   };
 
-  // --- FILTRADO INTELIGENTE ---
   const ventasPeriodo = ventas.filter(v => {
     const fVenta = new Date(v.created_at);
     if (modo === "mes") {
@@ -76,6 +74,67 @@ export default function Liquidaciones() {
     setFechaBase(nuevaFecha);
   };
 
+  // 📊 EXPORTAR EXCEL DE LIQUIDACIONES CON HOJA DE ESTILO PROFESIONAL
+  const exportarExcelLiquidaciones = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Corte de Ganancias");
+
+    worksheet.columns = [
+      { header: "Barbero / Empleado", key: "nombre", width: 25 },
+      { header: "Rol", key: "rol", width: 15 },
+      { header: "Bruto Generado (€)", key: "bruto", width: 22 },
+      { header: "Sueldo Barbero (50%) (€)", key: "sueldo", width: 25 },
+      { header: `Limpio para Admin (${nombreAdmin}) (€)`, key: "paraAdmin", width: 28 },
+    ];
+
+    // Estilo de Cabecera elegante (Gris muy oscuro)
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 32;
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "111111" } };
+      cell.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFF" } };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+    });
+
+    // Añadir cada registro calculado
+    reporteEmpleados.forEach((item) => {
+      const row = worksheet.addRow({
+        nombre: item.nombre.toUpperCase(),
+        rol: item.rol.toUpperCase(),
+        bruto: Number(item.totalGenerado),
+        sueldo: Number(item.ganadoPorBarbero),
+        paraAdmin: item.rol === "admin" ? "---" : Number(item.ganadoParaAdmin),
+      });
+
+      // Formatear columnas de monedas numéricas de manera profesional
+      row.getCell("bruto").numFmt = '"€"#,##0.00';
+      row.getCell("sueldo").numFmt = '"€"#,##0.00';
+      if(item.rol !== "admin") {
+        row.getCell("paraAdmin").numFmt = '"€"#,##0.00';
+      }
+      row.alignment = { vertical: "middle" };
+    });
+
+    worksheet.addRow([]); // Fila vacía protectora
+
+    // Resumen 1: Total neto para el admin
+    const r1 = worksheet.addRow(["", "", "", `Neto Final ${nombreAdmin}:`, totalFinalAdmin]);
+    r1.getCell(4).font = { bold: true };
+    r1.getCell(5).font = { bold: true, color: { argb: "000000" } };
+    r1.getCell(5).numFmt = '"€"#,##0.00';
+    r1.getCell(5).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCC00" } }; // Highlight Amarillo
+
+    // Resumen 2: Total acumulado a liquidar a empleados
+    const r2 = worksheet.addRow(["", "", "", "Total a pagar a Barberos:", totalPagosEmpleados]);
+    r2.getCell(4).font = { bold: true, color: { argb: "555555" } };
+    r2.getCell(5).font = { bold: true };
+    r2.getCell(5).numFmt = '"€"#,##0.00';
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const periodStr = modo === "mes" ? `${meses[fechaBase.getMonth()]}_${fechaBase.getFullYear()}` : `Semana_${getWeekNumber(fechaBase)}`;
+    saveAs(new Blob([buffer]), `Corte_Ganancias_${periodStr}.xlsx`);
+  };
+
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-4 border-[#FFCC00] border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
@@ -87,9 +146,18 @@ export default function Liquidaciones() {
           <h2 className="text-4xl font-black uppercase italic tracking-tighter text-white">
             Corte de <span className="text-[#FFCC00]">Ganancias</span>
           </h2>
-          <div className="flex items-center gap-3 mt-3 bg-white/5 p-2 rounded-xl w-fit">
-            <button onClick={() => setModo("mes")} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${modo === "mes" ? "bg-[#FFCC00] text-black" : "text-neutral-500"}`}>Vista Mensual</button>
-            <button onClick={() => setModo("semana")} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${modo === "semana" ? "bg-[#FFCC00] text-black" : "text-neutral-500"}`}>Vista Semanal</button>
+          <div className="flex items-center gap-4 mt-4">
+            <div className="flex items-center gap-3 bg-white/5 p-2 rounded-xl w-fit">
+              <button onClick={() => setModo("mes")} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${modo === "mes" ? "bg-[#FFCC00] text-black" : "text-neutral-500"}`}>Vista Mensual</button>
+              <button onClick={() => setModo("semana")} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${modo === "semana" ? "bg-[#FFCC00] text-black" : "text-neutral-500"}`}>Vista Semanal</button>
+            </div>
+            
+            <button 
+              onClick={exportarExcelLiquidaciones}
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-[10px] font-black text-[#FFCC00] uppercase tracking-widest rounded-xl hover:bg-[#FFCC00] hover:text-black transition-all duration-300"
+            >
+              <Download size={14} /> Descargar Excel
+            </button>
           </div>
         </div>
 

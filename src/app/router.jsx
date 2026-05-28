@@ -11,7 +11,7 @@ import AppLayout from "../layouts/AppLayout";
 import Liquidaciones from "../components/liquidaciones/Liquidaciones"; 
 import Informes from "../components/informes/Informes";
 
-// 🔐 COMPONENTE DE PROTECCIÓN DE RUTAS
+// 🔐 COMPONENTE DE PROTECCIÓN DE RUTAS ORIGINAL (SUPABASE)
 function ProtectedRoute({ children, allowedRoles }) {
   const [session, setSession] = useState(null);
   const [rol, setRol] = useState(null);
@@ -27,7 +27,6 @@ function ProtectedRoute({ children, allowedRoles }) {
         return;
       }
 
-      // Obtenemos el rol desde la tabla perfiles
       const { data: perfil } = await supabase
         .from("perfiles")
         .select("rol")
@@ -42,7 +41,6 @@ function ProtectedRoute({ children, allowedRoles }) {
     getSession();
   }, []);
 
-  // Pantalla de carga con estilo barbería
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -54,15 +52,84 @@ function ProtectedRoute({ children, allowedRoles }) {
     );
   }
 
-  // Si no hay sesión, al login
   if (!session) return <Navigate to="/" />;
 
-  // Si el rol no está permitido, redirigimos (puedes mandarlo al dashboard o al login)
   if (!allowedRoles.includes(rol)) {
     return <Navigate to={rol === "empleado" ? "/nuevo-cobro" : "/"} />;
   }
 
   return children;
+}
+
+// ⌨️ KEYPAD / CONTROL DE ACCESO POR PIN DE DUEÑO
+function AdminPinGate({ children }) {
+  // Pon aquí el PIN o contraseña que el dueño usará para desbloquear las páginas sensibles
+  const ADMIN_PIN = "1234"; 
+
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState(false);
+  // Guardamos en el estado si ya puso el PIN en esta sesión de navegador
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    return sessionStorage.getItem("admin_unlocked") === "true";
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (pin === ADMIN_PIN) {
+      sessionStorage.setItem("admin_unlocked", "true");
+      setIsUnlocked(true);
+      setError(false);
+    } else {
+      setError(true);
+      setPin("");
+    }
+  };
+
+  // Si ya metió el PIN con éxito, le mostramos la página (Dashboard, Informes, etc.)
+  if (isUnlocked) {
+    return children;
+  }
+
+  // Si no está desbloqueado, le pintamos la pantalla del PIN (estilo Barbería)
+  return (
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+      <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl max-w-sm w-full text-center shadow-2xl">
+        <div className="w-16 h-16 bg-[#FFCC00]/10 text-[#FFCC00] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#FFCC00]/20">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+          </svg>
+        </div>
+        
+        <h2 className="text-xl font-black uppercase tracking-wider text-white mb-2">Área Restringida</h2>
+        <p className="text-zinc-400 text-sm mb-6">Introduce la contraseña de encargado para continuar</p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="password"
+            maxLength={10}
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="••••••••"
+            className="w-full bg-black border-2 border-zinc-800 text-white text-center text-2xl py-3 rounded-lg focus:outline-none focus:border-[#FFCC00] tracking-widest transition-colors"
+            autoFocus
+          />
+          
+          {error && (
+            <p className="text-red-500 font-bold text-xs uppercase tracking-wider animate-shake">
+              ❌ Contraseña incorrecta
+            </p>
+          )}
+
+          <button
+            type="submit"
+            className="w-full bg-[#FFCC00] hover:bg-[#e6b800] text-black font-black uppercase tracking-widest text-sm py-3 rounded-lg transition-colors shadow-lg"
+          >
+            Acceder
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 // 🌐 CONFIGURACIÓN DEL ROUTER
@@ -73,52 +140,57 @@ export const router = createBrowserRouter([
   },
   {
     element: (
-      // Nivel 1: Protección general para entrar al Layout
       <ProtectedRoute allowedRoles={["admin", "empleado"]}>
         <AppLayout />
       </ProtectedRoute>
     ),
     children: [
       {
+        path: "/nuevo-cobro",
+        element: <NuevoCobro />, // Abierto para todos los que estén logueados
+      },
+      {
         path: "/dashboard",
         element: (
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <Dashboard />
+          <ProtectedRoute allowedRoles={["admin", "empleado"]}>
+            <AdminPinGate>
+              <Dashboard />
+            </AdminPinGate>
           </ProtectedRoute>
         ),
       },
       {
-        path: "/liquidaciones", // <-- NUEVA RUTA
-        element: (
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <Liquidaciones />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "/informes", // <-- NUEVA RUTA DE INFORMES
+        path: "/liquidaciones",
         element: (
           <ProtectedRoute allowedRoles={["admin", "empleado"]}>
-            <Informes />
+            <AdminPinGate>
+              <Liquidaciones />
+            </AdminPinGate>
           </ProtectedRoute>
         ),
       },
       {
-        path: "/nuevo-cobro",
-        element: <NuevoCobro />, // Hereda la protección del Layout (admin y empleado)
+        path: "/informes",
+        element: (
+          <ProtectedRoute allowedRoles={["admin", "empleado"]}>
+            <AdminPinGate>
+              <Informes />
+            </AdminPinGate>
+          </ProtectedRoute>
+        ),
       },
       {
         path: "/configuracion",
         element: (
-          // Nivel 2: Solo Admin gestiona el local
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <Configuracion />
+          <ProtectedRoute allowedRoles={["admin", "empleado"]}>
+            <AdminPinGate>
+              <Configuracion />
+            </AdminPinGate>
           </ProtectedRoute>
         ),
       },
     ],
   },
-  // Ruta por defecto para 404 o errores
   {
     path: "*",
     element: <Navigate to="/" />,

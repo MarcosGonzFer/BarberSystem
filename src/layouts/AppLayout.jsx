@@ -37,14 +37,19 @@ export default function AppLayout() {
   };
 
   const handleLogout = async () => {
+    // 🔐 Borramos el permiso del PIN de administrador inmediatamente
+    sessionStorage.removeItem("admin_unlocked");
+
+    // Cerramos sesión en Supabase y redirigimos
     await supabase.auth.signOut();
     navigate("/");
   };
 
+  // Se añade "empleado" a los roles para que vean los botones, pero el PinGate los frenará si no ponen la clave
   const navItems = [
-    { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["admin"] },
+    { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["admin", "empleado"] },
     { label: "Cobros", path: "/nuevo-cobro", icon: Wallet, roles: ["admin", "empleado"] },
-    { label: "Liquidaciones", path: "/liquidaciones", icon: Banknote, roles: ["admin"] },
+    { label: "Liquidaciones", path: "/liquidaciones", icon: Banknote, roles: ["admin", "empleado"] },
     { label: "Informes", path: "/informes", icon: ClipboardList, roles: ["admin", "empleado"] },
   ];
 

@@ -6,7 +6,10 @@ import {
   ChevronRight,
   ClipboardList,
   Filter,
+  Download,
 } from "lucide-react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 const getWeekNumber = (d) => {
   d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -120,6 +123,73 @@ export default function Informes() {
     setFechaBase(nueva);
   };
 
+  // 📊 EXPORTAR EXCEL CON DISEÑO PREMIUM
+  const exportarExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Informe de Ventas");
+
+    // Configurar columnas de manera ordenada con anchos fijos
+    worksheet.columns = [
+      { header: "Fecha / Hora", key: "fecha", width: 25 },
+      { header: "Cliente", key: "cliente", width: 25 },
+      { header: "Barbero / ID Empleado", key: "empleado", width: 25 },
+      { header: "Método de Pago", key: "metodo", width: 18 },
+      { header: "Total (€)", key: "total", width: 15 },
+    ];
+
+    // Estilo para la fila de Cabecera (Gris Oscuro Premium con letras blancas)
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 30;
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "1A1A1A" },
+      };
+      cell.font = {
+        name: "Arial",
+        size: 11,
+        bold: true,
+        color: { argb: "FFFFFF" },
+      };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+    });
+
+    // Añadir datos de la tabla mapeados
+    misVentasPeriodo.forEach((v) => {
+      const barberoName = todosLosBarberos.find(b => b.id === v.id_empleado)?.nombre || v.id_empleado;
+      const row = worksheet.addRow({
+        fecha: new Date(v.created_at).toLocaleString(),
+        cliente: v.cliente || "Cliente",
+        empleado: barberoName || "---",
+        metodo: v.metodo_pago.toUpperCase(),
+        total: Number(v.total),
+      });
+
+      // Formatear la celda de total como moneda de forma nativa
+      row.getCell("total").numFmt = '"€"#,##0.00';
+      row.alignment = { vertical: "middle" };
+    });
+
+    // Agregar espacio y un cuadro de resumen final abajo
+    worksheet.addRow([]);
+    const totalRow = worksheet.addRow(["", "", "", "TOTAL GENERAL:", resumenPagos.efectivo.total + resumenPagos.tarjeta.total]);
+    
+    // Estilo al Total General en Excel (Estilo Dorado BarberPro)
+    totalRow.getCell(4).font = { bold: true, size: 11 };
+    totalRow.getCell(5).font = { bold: true, size: 12, color: { argb: "000000" } };
+    totalRow.getCell(5).numFmt = '"€"#,##0.00';
+    totalRow.getCell(5).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFCC00" },
+    };
+
+    // Descargar archivo binario
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), `Informe_Ventas_${modo}_${fechaBase.toLocaleDateString().replace(/\//g, "-")}.xlsx`);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -133,11 +203,19 @@ export default function Informes() {
 
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between mb-10 gap-6">
-        <h2 className="text-3xl font-black">
-          Informes
-        </h2>
+        <div>
+          <h2 className="text-3xl font-black">
+            Informes
+          </h2>
+          <button 
+            onClick={exportarExcel}
+            className="mt-3 flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-xs font-black text-[#FFCC00] uppercase tracking-widest rounded-xl hover:bg-[#FFCC00] hover:text-black transition-all duration-300"
+          >
+            <Download size={14} /> Exportar Excel
+          </button>
+        </div>
 
-        <div className="flex bg-[#121212] rounded-xl p-1">
+        <div className="flex bg-[#121212] rounded-xl p-1 h-fit">
           {["dia","semana","mes"].map((m) => (
             <button
               key={m}
@@ -166,7 +244,7 @@ export default function Informes() {
           >
             <option value="todos">Todos</option>
             {todosLosBarberos.map((b) => (
-              <option key={b.id} value={b.id}>
+              <option key={b.id} value={b.id} className="bg-[#121212]">
                 {b.nombre}
               </option>
             ))}
@@ -228,7 +306,7 @@ export default function Informes() {
               className="flex justify-between bg-black/40 p-3 rounded-lg"
             >
               <span>{v.cliente || "Cliente"}</span>
-              <span>{v.metodo_pago}</span>
+              <span className="capitalize text-xs text-neutral-400">{v.metodo_pago}</span>
               <span className="text-[#FFCC00]">
                 €{v.total}
               </span>
